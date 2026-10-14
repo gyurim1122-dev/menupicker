@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>오늘 뭐 먹지?</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 16px;
+      background: #fff6ec;
+      color: #2b2118;
+      font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    }
+    .app {
+      width: 100%;
+      max-width: 440px;
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: 0 10px 30px rgba(120, 70, 20, 0.12);
+    }
+    h1 { margin: 0; text-align: center; font-size: 24px; }
+    .sub { text-align: center; color: #8a7867; font-size: 14px; margin: 6px 0 20px; }
+    h2 { font-size: 13px; color: #8a7867; margin: 18px 0 8px; }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1px solid #ecd9c3;
+      background: #fff;
+      color: #5a4636;
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .chip.active { background: #ff8a3d; border-color: #ff8a3d; color: #fff; font-weight: 600; }
+
+    .result {
+      margin-top: 22px;
+      min-height: 190px;
+      border-radius: 16px;
+      background: #fff1e0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 16px;
+    }
+    .result .emoji { font-size: 56px; line-height: 1.1; }
+    .result .name { font-size: 26px; font-weight: 700; margin-top: 8px; }
+    .result .cat { font-size: 13px; color: #8a7867; margin-top: 4px; }
+    .result.spinning .name { color: #b8a08a; }
+    .placeholder { color: #b8a08a; font-size: 15px; }
+
+    .blessing {
+      margin-top: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #e8590c;
+      animation: pop 0.5s ease-out;
+    }
+    .blessing .heart {
+      display: inline-block;
+      color: #ff4d6d;
+      animation: beat 1.2s ease-in-out infinite;
+    }
+    @keyframes pop {
+      from { opacity: 0; transform: translateY(8px) scale(0.95); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes beat {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.3); }
+    }
+
+    .btn-row { display: flex; gap: 8px; margin-top: 14px; }
+    button.main {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: #ff8a3d;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button.main:hover { background: #f27623; }
+    button.main:disabled { background: #e3c7ad; cursor: default; }
+    button.sub-btn {
+      padding: 14px 16px;
+      border: 1px solid #ecd9c3;
+      border-radius: 12px;
+      background: #fff;
+      color: #5a4636;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button.sub-btn:hover { background: #fff6ec; }
+    button.sub-btn:disabled { opacity: 0.5; cursor: default; }
+
+    .add-row { display: flex; gap: 8px; }
+    .add-row input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #ecd9c3;
+      border-radius: 8px;
+      font-size: 14px;
+      min-width: 0;
+    }
+    .add-row select {
+      padding: 10px 8px;
+      border: 1px solid #ecd9c3;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+    }
+    .add-row button {
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      background: #5a4636;
+      color: #fff;
+      cursor: pointer;
+    }
+    .history { font-size: 13px; color: #8a7867; line-height: 1.8; }
+    .excluded-chip {
+      display: inline-block;
+      background: #f3ebe2;
+      border-radius: 999px;
+      padding: 3px 10px;
+      margin: 2px 4px 2px 0;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .hint { font-size: 12px; color: #b8a08a; margin-top: 4px; }
+    .total { text-align: center; font-size: 12px; color: #b8a08a; margin-top: 18px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>🍽️ 오늘 뭐 먹지?</h1>
+    <p class="sub">고민은 그만, 버튼 한 번이면 끝!</p>
+
+    <h2>어떤 종류가 끌려요? (여러 개 선택 가능)</h2>
+    <div class="chips" id="catChips"></div>
+
+    <div class="result" id="result">
+      <div class="placeholder">아래 버튼을 눌러 보세요 👇</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="main" id="pickBtn">메뉴 추천받기</button>
+      <button class="sub-btn" id="banBtn" disabled>이건 싫어요</button>
+    </div>
+
+    <h2>먹고 싶은 메뉴 직접 추가</h2>
+    <div class="add-row">
+      <input id="newName" type="text" placeholder="예: 닭갈비" maxlength="20">
+      <select id="newCat"></select>
+      <button id="addBtn">추가</button>
+    </div>
+
+    <h2>최근 추천 기록</h2>
+    <div class="history" id="history">아직 기록이 없어요.</div>
+
+    <h2>제외한 메뉴</h2>
+    <div id="excluded"><span class="history">없음</span></div>
+    <div class="hint">제외한 메뉴를 누르면 다시 추천 목록에 들어가요.</div>
+
+    <div class="total" id="total"></div>
+  </div>
+
+  <script>
+    // 기본 메뉴 목록 (원하는 메뉴를 더 넣어도 돼요)
+    const baseMenus = [
+      // ----- 한식 -----
+      { name: "김치찌개", emoji: "🍲", cat: "한식" },
+      { name: "된장찌개", emoji: "🥘", cat: "한식" },
+      { name: "순두부찌개", emoji: "🍲", cat: "한식" },
+      { name: "부대찌개", emoji: "🍲", cat: "한식" },
+      { name: "비빔밥", emoji: "🍚", cat: "한식" },
+      { name: "돌솥비빔밥", emoji: "🍚", cat: "한식" },
+      { name: "불고기", emoji: "🥩", cat: "한식" },
+      { name: "제육볶음", emoji: "🥩", cat: "한식" },
+      { name: "삼겹살", emoji: "🥓", cat: "한식" },
+      { name: "갈비찜", emoji: "🍖", cat: "한식" },
+      { name: "닭갈비", emoji: "🍗", cat: "한식" },
+      { name: "찜닭", emoji: "🍗", cat: "한식" },
+      { name: "삼계탕", emoji: "🍲", cat: "한식" },
+      { name: "설렁탕", emoji: "🍜", cat: "한식" },
+      { name: "갈비탕", emoji: "🍲", cat: "한식" },
+      { name: "감자탕", emoji: "🍲", cat: "한식" },
+      { name: "육개장", emoji: "🌶️", cat: "한식" },
+      { name: "칼국수", emoji: "🍜", cat: "한식" },
+      { name: "냉면", emoji: "🍜", cat: "한식" },
+      { name: "비빔국수", emoji: "🍜", cat: "한식" },
+      { name: "콩국수", emoji: "🍜", cat: "한식" },
+      { name: "수제비", emoji: "🍲", cat: "한식" },
+      { name: "국밥", emoji: "🍲", cat: "한식" },
+      { name: "순대국", emoji: "🍲", cat: "한식" },
+      { name: "청국장", emoji: "🥘", cat: "한식" },
+      { name: "김치볶음밥", emoji: "🍳", cat: "한식" },
+      { name: "오므라이스", emoji: "🍳", cat: "한식" },
+      { name: "아구찜", emoji: "🌶️", cat: "한식" },
+      { name: "해물찜", emoji: "🦑", cat: "한식" },
+      { name: "생선구이", emoji: "🐟", cat: "한식" },
+      { name: "낙지볶음", emoji: "🐙", cat: "한식" },
+      { name: "쌈밥", emoji: "🥬", cat: "한식" },
+      { name: "곤드레밥", emoji: "🍚", cat: "한식" },
+      { name: "막국수", emoji: "🍜", cat: "한식" },
+
+      // ----- 중식 -----
+      { name: "짜장면", emoji: "🍜", cat: "중식" },
+      { name: "짬뽕", emoji: "🌶️", cat: "중식" },
+      { name: "짬짜면", emoji: "🍜", cat: "중식" },
+      { name: "탕수육", emoji: "🍖", cat: "중식" },
+      { name: "마라탕", emoji: "🌶️", cat: "중식" },
+      { name: "마라샹궈", emoji: "🌶️", cat: "중식" },
+      { name: "볶음밥", emoji: "🍳", cat: "중식" },
+      { name: "잡채밥", emoji: "🍚", cat: "중식" },
+      { name: "깐풍기", emoji: "🍗", cat: "중식" },
+      { name: "유린기", emoji: "🍗", cat: "중식" },
+      { name: "양장피", emoji: "🥗", cat: "중식" },
+      { name: "꿔바로우", emoji: "🍖", cat: "중식" },
+      { name: "딤섬", emoji: "🥟", cat: "중식" },
+      { name: "군만두", emoji: "🥟", cat: "중식" },
+      { name: "멘보샤", emoji: "🍞", cat: "중식" },
+      { name: "울면", emoji: "🍜", cat: "중식" },
+      { name: "마파두부", emoji: "🌶️", cat: "중식" },
+      { name: "경장육슬", emoji: "🥢", cat: "중식" },
+
+      // ----- 일식 -----
+      { name: "초밥", emoji: "🍣", cat: "일식" },
+      { name: "회덮밥", emoji: "🍣", cat: "일식" },
+      { name: "라멘", emoji: "🍜", cat: "일식" },
+      { name: "돈카츠", emoji: "🍱", cat: "일식" },
+      { name: "우동", emoji: "🍜", cat: "일식" },
+      { name: "소바", emoji: "🍜", cat: "일식" },
+      { name: "규동", emoji: "🍚", cat: "일식" },
+      { name: "가츠동", emoji: "🍚", cat: "일식" },
+      { name: "오야코동", emoji: "🍳", cat: "일식" },
+      { name: "텐동", emoji: "🍤", cat: "일식" },
+      { name: "연어덮밥", emoji: "🍣", cat: "일식" },
+      { name: "샤브샤브", emoji: "🍲", cat: "일식" },
+      { name: "오코노미야키", emoji: "🥞", cat: "일식" },
+      { name: "타코야키", emoji: "🐙", cat: "일식" },
+      { name: "일식 카레", emoji: "🍛", cat: "일식" },
+      { name: "장어덮밥", emoji: "🐍", cat: "일식" },
+      { name: "스키야키", emoji: "🍲", cat: "일식" },
+      { name: "이자카야 안주", emoji: "🍶", cat: "일식" },
+
+      // ----- 양식 -----
+      { name: "파스타", emoji: "🍝", cat: "양식" },
+      { name: "크림 파스타", emoji: "🍝", cat: "양식" },
+      { name: "토마토 파스타", emoji: "🍝", cat: "양식" },
+      { name: "리조또", emoji: "🍚", cat: "양식" },
+      { name: "피자", emoji: "🍕", cat: "양식" },
+      { name: "햄버거", emoji: "🍔", cat: "양식" },
+      { name: "스테이크", emoji: "🥩", cat: "양식" },
+      { name: "샐러드", emoji: "🥗", cat: "양식" },
+      { name: "그라탕", emoji: "🧀", cat: "양식" },
+      { name: "라자냐", emoji: "🍝", cat: "양식" },
+      { name: "수제버거", emoji: "🍔", cat: "양식" },
+      { name: "치킨 샌드위치", emoji: "🥪", cat: "양식" },
+      { name: "함박스테이크", emoji: "🍖", cat: "양식" },
+      { name: "클램차우더", emoji: "🥣", cat: "양식" },
+      { name: "브런치", emoji: "🥞", cat: "양식" },
+      { name: "에그 베네딕트", emoji: "🍳", cat: "양식" },
+      { name: "바비큐 립", emoji: "🍖", cat: "양식" },
+      { name: "핫도그", emoji: "🌭", cat: "양식" },
+
+      // ----- 분식 -----
+      { name: "떡볶이", emoji: "🌶️", cat: "분식" },
+      { name: "로제 떡볶이", emoji: "🍝", cat: "분식" },
+      { name: "김밥", emoji: "🍙", cat: "분식" },
+      { name: "참치김밥", emoji: "🍙", cat: "분식" },
+      { name: "라면", emoji: "🍜", cat: "분식" },
+      { name: "치즈라면", emoji: "🧀", cat: "분식" },
+      { name: "순대", emoji: "🍢", cat: "분식" },
+      { name: "튀김", emoji: "🍤", cat: "분식" },
+      { name: "어묵", emoji: "🍢", cat: "분식" },
+      { name: "쫄면", emoji: "🍜", cat: "분식" },
+      { name: "만두", emoji: "🥟", cat: "분식" },
+      { name: "떡만두국", emoji: "🍲", cat: "분식" },
+      { name: "라볶이", emoji: "🍜", cat: "분식" },
+      { name: "토스트", emoji: "🍞", cat: "분식" },
+      { name: "컵밥", emoji: "🍚", cat: "분식" },
+      { name: "주먹밥", emoji: "🍙", cat: "분식" },
+
+      // ----- 야식 -----
+      { name: "치킨", emoji: "🍗", cat: "야식" },
+      { name: "양념치킨", emoji: "🍗", cat: "야식" },
+      { name: "후라이드치킨", emoji: "🍗", cat: "야식" },
+      { name: "족발", emoji: "🍖", cat: "야식" },
+      { name: "보쌈", emoji: "🥬", cat: "야식" },
+      { name: "곱창", emoji: "🔥", cat: "야식" },
+      { name: "막창", emoji: "🔥", cat: "야식" },
+      { name: "닭발", emoji: "🌶️", cat: "야식" },
+      { name: "오돌뼈", emoji: "🍖", cat: "야식" },
+      { name: "골뱅이무침", emoji: "🍜", cat: "야식" },
+      { name: "회", emoji: "🐟", cat: "야식" },
+      { name: "파전", emoji: "🥞", cat: "야식" },
+      { name: "감자튀김", emoji: "🍟", cat: "야식" },
+      { name: "피자 한 판", emoji: "🍕", cat: "야식" },
+      { name: "라면 + 계란밥", emoji: "🍜", cat: "야식" },
+      { name: "치킨 + 맥주", emoji: "🍻", cat: "야식" },
+      { name: "육회", emoji: "🥩", cat: "야식" },
+
+      // ----- 기타 -----
+      { name: "쌀국수", emoji: "🍜", cat: "기타" },
+      { name: "팟타이", emoji: "🍜", cat: "기타" },
+      { name: "나시고렝", emoji: "🍛", cat: "기타" },
+      { name: "카레", emoji: "🍛", cat: "기타" },
+      { name: "커리와 난", emoji: "🫓", cat: "기타" },
+      { name: "타코", emoji: "🌮", cat: "기타" },
+      { name: "부리또", emoji: "🌯", cat: "기타" },
+      { name: "케밥", emoji: "🥙", cat: "기타" },
+      { name: "샌드위치", emoji: "🥪", cat: "기타" },
+      { name: "포케", emoji: "🥗", cat: "기타" },
+      { name: "반미", emoji: "🥖", cat: "기타" },
+      { name: "분짜", emoji: "🍜", cat: "기타" },
+      { name: "똠얌꿍", emoji: "🍲", cat: "기타" },
+      { name: "팔라펠", emoji: "🧆", cat: "기타" },
+      { name: "빵과 커피", emoji: "☕", cat: "기타" },
+      { name: "베이글", emoji: "🥯", cat: "기타" },
+      { name: "죽", emoji: "🥣", cat: "기타" },
+      { name: "도시락", emoji: "🍱", cat: "기타" }
+    ];
+    const categories = ["한식", "중식", "일식", "양식", "분식", "야식", "기타"];
+    const catEmoji = { "한식": "🍚", "중식": "🥢", "일식": "🍣", "양식": "🍝", "분식": "🍢", "야식": "🌙", "기타": "✨" };
+
+    // 맛있게 먹으라는 마지막 멘트 (여러 개 중 랜덤)
+    const blessings = [
+      "맛있게 먹고 행복하세요",
+      "맛있게 드시고 오늘도 행복하세요",
+      "맛있게 먹고 힘내세요, 행복한 하루 되세요"
+    ];
+
+    // ----- 저장 / 불러오기 -----
+    function load(key, fallback) {
+      try {
+        const v = JSON.parse(localStorage.getItem(key));
+        return v === null || v === undefined ? fallback : v;
+      } catch (e) { return fallback; }
+    }
+    function save(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+    }
+
+    let customMenus = load("customMenus", []);
+    let excluded = load("excludedMenus", []);
+    let history = load("menuHistory", []);
+    let selectedCats = new Set(load("selectedCats", []));
+    let current = null;
+    let spinning = false;
+
+    const chipsEl = document.getElementById("catChips");
+    const resultEl = document.getElementById("result");
+    const pickBtn = document.getElementById("pickBtn");
+    const banBtn = document.getElementById("banBtn");
+    const historyEl = document.getElementById("history");
+    const excludedEl = document.getElementById("excluded");
+    const newName = document.getElementById("newName");
+    const newCat = document.getElementById("newCat");
+    const totalEl = document.getElementById("total");
+
+    function allMenus() { return baseMenus.concat(customMenus); }
+
+    function pool() {
+      return allMenus().filter(m =>
+        !excluded.includes(m.name) &&
+        (selectedCats.size === 0 || selectedCats.has(m.cat))
+      );
+    }
+
+    // ----- 화면 그리기 -----
+    function renderTotal() {
+      totalEl.textContent = "현재 메뉴 " + allMenus().length + "개 중에서 골라 드려요";
+    }
+
+    function renderChips() {
+      chipsEl.innerHTML = "";
+      const all = document.createElement("button");
+      all.className = "chip" + (selectedCats.size === 0 ? " active" : "");
+      all.textContent = "🎲 전체";
+      all.onclick = () => { selectedCats.clear(); save("selectedCats", []); renderChips(); };
+      chipsEl.appendChild(all);
+
+      categories.forEach(c => {
+        const b = document.createElement("button");
+        b.className = "chip" + (selectedCats.has(c) ? " active" : "");
+        b.textContent = catEmoji[c] + " " + c;
+        b.onclick = () => {
+          selectedCats.has(c) ? selectedCats.delete(c) : selectedCats.add(c);
+          save("selectedCats", Array.from(selectedCats));
+          renderChips();
+        };
+        chipsEl.appendChild(b);
+      });
+    }
+
+    function showMenu(m, isSpinning) {
+      resultEl.classList.toggle("spinning", !!isSpinning);
+      resultEl.innerHTML = "";
+      const e = document.createElement("div");
+      e.className = "emoji"; e.textContent = m.emoji || "🍽️";
+      const n = document.createElement("div");
+      n.className = "name"; n.textContent = m.name;
+      const c = document.createElement("div");
+      c.className = "cat"; c.textContent = m.cat;
+      resultEl.append(e, n, c);
+
+      // 룰렛이 멈췄을 때만 마지막 멘트 표시
+      if (!isSpinning) {
+        const b = document.createElement("div");
+        b.className = "blessing";
+        b.append(blessings[Math.floor(Math.random() * blessings.length)] + " ");
+        const h = document.createElement("span");
+        h.className = "heart";
+        h.textContent = "♥";
+        b.appendChild(h);
+        resultEl.appendChild(b);
+      }
+    }
+
+    function renderHistory() {
+      historyEl.textContent = history.length
+        ? history.slice(0, 5).join("  →  ")
+        : "아직 기록이 없어요.";
+    }
+
+    function renderExcluded() {
+      excludedEl.innerHTML = "";
+      if (excluded.length === 0) {
+        excludedEl.innerHTML = '<span class="history">없음</span>';
+        return;
+      }
+      excluded.forEach(name => {
+        const s = document.createElement("span");
+        s.className = "excluded-chip";
+        s.textContent = name + " ✕";
+        s.onclick = () => {
+          excluded = excluded.filter(x => x !== name);
+          save("excludedMenus", excluded);
+          renderExcluded();
+        };
+        excludedEl.appendChild(s);
+      });
+    }
+
+    // ----- 추천하기 (룰렛 효과) -----
+    pickBtn.addEventListener("click", () => {
+      if (spinning) return;
+      const list = pool();
+      if (list.length === 0) {
+        resultEl.classList.remove("spinning");
+        resultEl.innerHTML = '<div class="placeholder">추천할 메뉴가 없어요.<br>종류를 바꾸거나 제외한 메뉴를 되돌려 보세요.</div>';
+        current = null;
+        banBtn.disabled = true;
+        return;
+      }
+
+      spinning = true;
+      pickBtn.disabled = true;
+      banBtn.disabled = true;
+
+      const final = list[Math.floor(Math.random() * list.length)];
+      let step = 0;
+      const total = 14;
+
+      function tick() {
+        if (step < total) {
+          showMenu(list[Math.floor(Math.random() * list.length)], true);
+          step++;
+          setTimeout(tick, 60 + step * 18); // 점점 느려지는 효과
+        } else {
+          current = final;
+          showMenu(final, false);
+          history.unshift(final.name);
+          history = history.slice(0, 20);
+          save("menuHistory", history);
+          renderHistory();
+          spinning = false;
+          pickBtn.disabled = false;
+          pickBtn.textContent = "다시 추천받기";
+          banBtn.disabled = false;
+        }
+      }
+      tick();
+    });
+
+    // ----- 이건 싫어요 -----
+    banBtn.addEventListener("click", () => {
+      if (!current || spinning) return;
+      if (!excluded.includes(current.name)) excluded.push(current.name);
+      save("excludedMenus", excluded);
+      renderExcluded();
+      banBtn.disabled = true;
+      pickBtn.click();
+    });
+
+    // ----- 메뉴 직접 추가 -----
+    categories.forEach(c => {
+      const o = document.createElement("option");
+      o.value = c; o.textContent = c;
+      newCat.appendChild(o);
+    });
+
+    function addMenu() {
+      const name = newName.value.trim();
+      if (!name) return;
+      if (allMenus().some(m => m.name === name)) {
+        newName.value = "";
+        return;
+      }
+      customMenus.push({ name, emoji: catEmoji[newCat.value], cat: newCat.value });
+      save("customMenus", customMenus);
+      newName.value = "";
+      renderTotal();
+      resultEl.classList.remove("spinning");
+      resultEl.innerHTML = "";
+      const p = document.createElement("div");
+      p.className = "placeholder";
+      p.textContent = '"' + name + '" 추가됐어요! ✅';
+      resultEl.appendChild(p);
+    }
+    document.getElementById("addBtn").addEventListener("click", addMenu);
+    newName.addEventListener("keydown", e => { if (e.key === "Enter") addMenu(); });
+
+    // ----- 시작 -----
+    renderChips();
+    renderHistory();
+    renderExcluded();
+    renderTotal();
+  </script>
+</body>
+</html>
